@@ -1,39 +1,43 @@
+# The Game is where it all starts. A Game is an abstract and thin package in
+# which all of the elements of the game are stored. It is responsible for
+# creating the world, parsing and writing to save files, and turning on/off
+# graphics.
 
 from core import gfx
 
 import sys
 import traceback
-import curses
 
 # A Game represents a single instance of a game, including its maps,
 # data, and everything else.
 class Game(object):
     def __init__(self):
-        pass
+        self.x,self.y = 0,0
     
-    def step(self):
-        running = True
-        x,y = 0,0
-        while running:
-            c = gfx.scr().getch()
-            if c == curses.KEY_UP:      y -= 1
-            elif c == curses.KEY_DOWN:  y += 1
-            elif c == curses.KEY_LEFT:  x -= 1
-            elif c == curses.KEY_RIGHT: x += 1
-            elif c == ord('q'): running  = False
-            
-            if c != -1:
-                gfx.scr().clear()
-                gfx.scr().addch(y,x,"@")
+    # Test method
+    def handle(self, c):
+        if c == "up":      self.y -= 1
+        elif c == "down":  self.y += 1
+        elif c == "left":  self.x -= 1
+        elif c == "right": self.x += 1
+        
+        if c:
+            gfx.clear()
+            gfx.draw(self.x,self.y,'@')
 
-    
-    
-    # Runs an interactive session of our game with the player.
+    # Runs an interactive session of our game with the player until either
+    # the player stops playing or an error occurs. Here, we pass input to the
+    # world until we are told we don't need to anymore. If an error occurs, we
+    # turn off graphics, print the traceback, and kill the program.
     def play(self):
         gfx.start()
         
-        try: 
-            self.step()
+        try:
+            running = True
+            while running:
+                c = gfx.get_input()
+                self.handle(c)
+                if c == "q": running = False
         except:
             gfx.stop()  
             print(traceback.format_exc())
