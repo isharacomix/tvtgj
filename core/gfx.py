@@ -91,7 +91,7 @@ def get_input():
     global screen, keymap
     if screen:
         c = screen.getch()
-        curses.flushinp()
+        #curses.flushinp()
         if c > 0 and c < 256: return "%c"%c
         elif c in keymap: return keymap[c]
     return None
@@ -109,7 +109,7 @@ def draw(x,y,c):
     if screen:
         h,w = screen.getmaxyx()
         if x >= 0 and x < w and y >= 0 and y < h and (x,y)!=(w-1,h-1):
-            screen.addch(y,x,c)
+            screen.addch(y,x,c[0])
 
 
 

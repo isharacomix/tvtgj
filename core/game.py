@@ -4,26 +4,24 @@
 # graphics.
 
 from core import gfx
+from core import world
 
 import sys
 import traceback
+
 
 # A Game represents a single instance of a game, including its maps,
 # data, and everything else.
 class Game(object):
     def __init__(self):
-        self.x,self.y = 0,0
+        self.world = world.World()
     
     # Test method
     def handle(self, c):
-        if c == "up":      self.y -= 1
-        elif c == "down":  self.y += 1
-        elif c == "left":  self.x -= 1
-        elif c == "right": self.x += 1
-        
-        if c:
-            gfx.clear()
-            gfx.draw(self.x,self.y,'@')
+        if   c == "up":    self.world.player_y -= 1
+        elif c == "down":  self.world.player_y += 1
+        elif c == "left":  self.world.player_x -= 1
+        elif c == "right": self.world.player_x += 1
 
     # Runs an interactive session of our game with the player until either
     # the player stops playing or an error occurs. Here, we pass input to the
@@ -38,11 +36,11 @@ class Game(object):
                 c = gfx.get_input()
                 self.handle(c)
                 if c == "q": running = False
+                self.world.draw()
         except:
             gfx.stop()  
             print(traceback.format_exc())
             sys.exit(-1)
         
         gfx.stop()
-
 
