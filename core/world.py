@@ -67,12 +67,20 @@ class Entity(object):
         self.x = x
         self.y = y
         self.char = name[0]
+        self.target = None
     
     # Attempt to move 1 tile in a direction.
     def move(self, way):
         pos = direction(self.x, self.y, way)
         if pos: self.x, self.y = pos
 
+    # Attempt to move the target.
+    def target_move(self, way):
+        if not self.target:
+            self.target = self.x,self.y
+        x,y = self.target
+        pos = direction(x,y,way)
+        if pos: self.target = pos
         
 
 # The World is our view into the tiled game world. Entities exist within the
@@ -104,6 +112,9 @@ class World(object):
                             empty = False
                     if empty:
                         gfx.draw(ax,y,".")
+                if self.player.target == (x,y):
+                    gfx.draw(ax-1,y,"[")
+                    gfx.draw(ax+1,y,"]")
 
     # Handle input.
     def handle(self, c):
@@ -113,4 +124,12 @@ class World(object):
         elif c == "h": self.player.move(3)
         elif c == "n": self.player.move(4)
         elif c == "m": self.player.move(5)
+        elif c == "f": self.player.target_move(0)
+        elif c == "r": self.player.target_move(1)
+        elif c == "e": self.player.target_move(2)
+        elif c == "s": self.player.target_move(3)
+        elif c == "x": self.player.target_move(4)
+        elif c == "c": self.player.target_move(5)
+        elif c == "d": self.player.target = None
+        
 
