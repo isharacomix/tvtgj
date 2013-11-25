@@ -29,6 +29,14 @@ def start():
         screen.keypad(1)
         screen.timeout(0)
         screen.scrollok(False)
+        curses.start_color()
+        
+        i = 1
+        for a in range(8):
+            for b in range(8):
+                if a != b:
+                    curses.init_pair(i, b, a)
+                    i += 1
 
 # This turns off curses and makes it safe to kill the program. You can call
 # stop more than once safely.
@@ -103,13 +111,50 @@ def clear():
     if screen:
         screen.erase()
 
-# Draw a character at X,Y. Includes boundary checking.
-def draw(x,y,c):
+# This function returns the curses color pair for the provided color
+# represented as a pair of characters.
+#   x = black
+#   r = red
+#   g = green
+#   y = yellow
+#   b = blue
+#   m = magenta
+#   c = cyan
+#   w = white
+def color(fg="w", bg="b"):
+    fg = fg.lower()
+    bg = bg.lower()
+    
+    if fg not in "xrgybmcw": fg = "w"
+    if bg not in "xrgybmcw": bg = "x"
+    if fg == bg: fg = "x"
+    
+    i = "xrgybmcw".index(fg)
+    j = "xrgybmcw".index(bg)
+    
+    if (fg,bg) == ("w","x"):
+        return curses.color_pair(0)
+    return curses.color_pair(i + j*7 + (1 if i<j else 0))
+
+# Draw a character at X,Y. Includes boundary checking. You can also
+# include color codes. Lowercase letters are foreground, uppercase are
+# background. Use an ! for bold and ? for reverse
+def draw(x,y,c,col=""):
     global screen
     if screen:
         h,w = screen.getmaxyx()
         if x >= 0 and x < w and y >= 0 and y < h and (x,y)!=(w-1,h-1):
-            screen.addch(y,x,c[0])
-
-
+            mod = 0
+            if "!" in col: mod |= curses.A_BOLD
+            if "?" in col: mod |= curses.A_REVERSE
+            if curses.has_colors():
+                fg = "w"
+                bg = "x"
+                for q in "wrgybmcw":
+                    if q in col: fg = q
+                for q in "WRGYBMCW":
+                    if q in col: bg = q
+                mod |= color(fg,bg)
+            
+            screen.addch(y,x,c,mod)
 
