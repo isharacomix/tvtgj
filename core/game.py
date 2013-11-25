@@ -16,13 +16,6 @@ class Game(object):
     def __init__(self):
         self.world = world.World()
     
-    # Test method
-    def handle(self, c):
-        if   c == "up":    self.world.player_y -= 1
-        elif c == "down":  self.world.player_y += 1
-        elif c == "left":  self.world.player_x -= 1
-        elif c == "right": self.world.player_x += 1
-
     # Runs an interactive session of our game with the player until either
     # the player stops playing or an error occurs. Here, we pass input to the
     # world until we are told we don't need to anymore. If an error occurs, we
@@ -34,7 +27,7 @@ class Game(object):
             running = True
             while running:
                 c = gfx.get_input()
-                self.handle(c)
+                self.world.handle(c)
                 if c == "q": running = False
                 self.world.draw()
         except:
