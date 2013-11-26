@@ -46,6 +46,79 @@ def ring(x,y,r):
     return report
 
 
+# A-B = 4 B-C = 3
+#   . . . . . . . . . .
+#    . . . . . . . . C . 
+#   . . . . . B . . . .
+#    . . . . . . . . . . 
+#   . . A . . . . . . .
+#    . . . . . . . . . . 
+#
+#
+# This returns the distance between two tiles.
+# Algorithm: First, walk down/diagonally until at the same row. Then
+# calculate horizontal distance.
+def distance( pos1, pos2 ):
+    x1,y1 = pos1
+    x2,y2 = pos2
+    if x1 > x2:
+        x1,y1 = pos2
+        x2,y2 = pos1
+      
+    # First, go diagonally and left. pos2 is guaranteed to be to the right
+    # of pos1, which helps us deal with the assumptions of how to handle odd
+    # rows.
+    dist = 0
+    odd = True if y2 % 2 == 1 else False
+    dy = 1 if y1 > y2 else -1
+    while y1 != y2:
+        if x1 < x2:
+            if not odd: x2 -= 1
+        y2 += dy
+        odd = not odd
+        dist += 1
+    dist += x2-x1
+    
+    return dist
+
+# This returns the angle between two tiles.
+def angle( pos1, pos2 ):
+    if pos1 == pos2:
+        return None
+    
+    x1,y1 = pos1
+    x2,y2 = pos2
+    
+    # Basically create a ring around pos1, and then find the position
+    # in the ring of pos2.
+    r = distance(pos1,pos2)
+    orig = ring(x1,y1,r)
+    i = orig.index(pos2)
+    angle = i * 360.0 / (r*6)
+    
+    return angle
+
+
+# This takes the definition of an arc (a set of (st,en) tuples) and
+# breaks them at angle by putting a gap of size degrees in the arc.
+def split_arc(arc, angle, size):
+    report = []
+    size = size/2
+    for (st,en) in arc:
+        if st <= angle and angle <= en:
+            s1,e1 = st,angle-size
+            s2,e2 = angle+size,en
+            
+            # TODO: Still some weird edge cases.
+            
+            if s1 < e1: report.append((s1,e1))
+            if s2 < e2: report.append((s2,e2))
+        else:
+            report.append((st,en))
+            
+    return report
+
+
 # Get the X,Y coordinates of the neighbor of x,y in direction d.
 #   2 1    Returns None if no such direction.
 #  3 @ 0
@@ -58,16 +131,10 @@ def direction(x, y, d):
 # The arc method takes a list of tuples containing "start_degree, end_degree"
 # pairs. It returns the sublist of a complete ring that fits within the starts
 # and ends.
-#
-#                90
-#           180     0
-#               270
-#       0   60  120 180 240 300 360
-#
 def arc(x, y, r, endpoints):
     if r < 1:
         return ring(x,y,r)
-    orig = ring(x,y,r)[:-1]
+    orig = ring(x,y,r)
     report = []
     for (st, en) in endpoints:
         chunk_size = 360.0 / (r*6)
@@ -83,13 +150,6 @@ def arc(x, y, r, endpoints):
             else:
                 report += orig[st_i:]
                 report += orig[:en_i+1]
-    return report
-
-# 
-def fov(x,y,r,angles):
-    report = [(x,y)]
-    for i in range(r+1):
-        report += arc(x,y,i,angles)
     return report
 
 
@@ -141,10 +201,23 @@ class World(object):
             return True
         return False
     
+    # Do field of vision calculations in the world. Causes breaks in
+    # opaque tiles. Normally goes in all directions, but you can constrain it.
+    def fov(self,x,y,r,angles=[(0,360)]):
+        report = [(x,y)]
+        for i in range(r+1):
+            view = arc(x,y,i,angles)
+            for (ox,oy) in view:
+                if self.map[oy][ox] == "#":
+                    theta = angle((x,y),(ox,oy))
+                    angles = split_arc(angles, theta, 30)
+            report += view
+        return report
+    
     # Draws the world.
     def draw(self):
         gfx.clear()
-        my_fov = fov(self.player.x,self.player.y,6,[(self.player.angle-self.player.lense,self.player.angle+self.player.lense)])
+        my_fov = self.fov(self.player.x,self.player.y,6,[(self.player.angle-self.player.lense,self.player.angle+self.player.lense)])
         for y in range(self.h):
             odd = True if y % 2 == 1 else False
             for x in range(self.w):
