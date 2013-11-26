@@ -134,7 +134,7 @@ def arc(x, y, r, endpoints):
             en += 360
         if en-st > 359:
             return orig
-        elif en-st > h_chunk:
+        if st < en:
             st_i = int(1.0*(st+h_chunk) / chunk_size) % (r*6)
             en_i = int(1.0*(en+h_chunk) / chunk_size) % (r*6)
             if st_i <= en_i:
@@ -205,7 +205,7 @@ class World(object):
             for (ox,oy) in view:
                 if not self.is_free(ox,oy):
                     theta = angle((x,y),(ox,oy))
-                    angles = split_arc(angles, theta, 360./(i*6))
+                    angles = split_arc(angles, theta, 180./(i*6))
             report += view
         return report
     
