@@ -34,9 +34,8 @@ def start():
         i = 1
         for a in range(8):
             for b in range(8):
-                if a != b:
-                    curses.init_pair(i, b, a)
-                    i += 1
+                curses.init_pair(i, b, a)
+                i += 1
 
 # This turns off curses and makes it safe to kill the program. You can call
 # stop more than once safely.
@@ -127,14 +126,13 @@ def color(fg="w", bg="b"):
     
     if fg not in "xrgybmcw": fg = "w"
     if bg not in "xrgybmcw": bg = "x"
-    if fg == bg: fg = "x"
     
     i = "xrgybmcw".index(fg)
     j = "xrgybmcw".index(bg)
     
     if (fg,bg) == ("w","x"):
         return curses.color_pair(0)
-    return curses.color_pair(i + j*7 + (1 if i<j else 0))
+    return curses.color_pair(1 + j*8 + i)
 
 # Draw a character at X,Y. Includes boundary checking. You can also
 # include color codes. Lowercase letters are foreground, uppercase are
@@ -150,9 +148,9 @@ def draw(x,y,c,col=""):
             if curses.has_colors():
                 fg = "w"
                 bg = "x"
-                for q in "wrgybmcw":
+                for q in "xwrgybmcw":
                     if q in col: fg = q
-                for q in "WRGYBMCW":
+                for q in "XWRGYBMCW":
                     if q in col: bg = q
                 mod |= color(fg,bg)
             

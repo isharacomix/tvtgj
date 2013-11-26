@@ -243,8 +243,8 @@ class World(object):
                         c = self.map[y][x]
                         gfx.draw(ax,y,c,"g" if c == "." else "y")
                 if self.player.target == (x,y):
-                    gfx.draw(ax-1,y,"[")
-                    gfx.draw(ax+1,y,"]")
+                    gfx.draw(ax-1,y,"[","r!")
+                    gfx.draw(ax+1,y,"]","xX!")
 
     # Handle input.
     def handle(self, c):
