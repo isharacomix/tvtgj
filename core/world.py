@@ -45,16 +45,6 @@ def ring(x,y,r):
     # end of the list.
     return report
 
-
-# A-B = 4 B-C = 3
-#   . . . . . . . . . .
-#    . . . . . . . . C . 
-#   . . . . . B . . . .
-#    . . . . . . . . . . 
-#   . . A . . . . . . .
-#    . . . . . . . . . . 
-#
-#
 # This returns the distance between two tiles.
 # Algorithm: First, walk down/diagonally until at the same row. Then
 # calculate horizontal distance.
@@ -103,13 +93,13 @@ def angle( pos1, pos2 ):
 # breaks them at angle by putting a gap of size degrees in the arc.
 def split_arc(arc, angle, size):
     report = []
-    size = size/2
     for (st,en) in arc:
         if st <= angle and angle <= en:
             s1,e1 = st,angle-size
             s2,e2 = angle+size,en
             
-            # TODO: Still some weird edge cases.
+            # Does not work on the 0,360 split, or for certain boundary
+            # cases.
             
             if s1 < e1: report.append((s1,e1))
             if s2 < e2: report.append((s2,e2))
@@ -142,6 +132,8 @@ def arc(x, y, r, endpoints):
         while st < 0:
             st += 360
             en += 360
+        if en-st > 359:
+            return orig
         if st < en:
             st_i = int(1.0*(st+h_chunk) / chunk_size) % (r*6)
             en_i = int(1.0*(en+h_chunk) / chunk_size) % (r*6)
@@ -185,18 +177,21 @@ class World(object):
         self.w = 20
         self.h = 20
         self.map = ["."*self.w]*self.h
-        self.player = Entity("Player",4,4)
+        self.player = Entity("Player",15,5)
         self.entities = [self.player]
         self.player.char = "@"
         
         
         for a in range(self.h):
             for b in range(self.w):
-                if random.randint(0,100) < 10:
+                #if random.randint(0,100) < 5:
+                if a == 10 or b == 10:
                     self.map[a] = self.map[a][:b]+"#"+self.map[a][b+1:]
     
     # Returns true if a square is free.
     def is_free(self, x, y):
+        if x < 0 or y < 0 or x >= self.w or y >= self.h:
+            return False
         if self.map[y][x] != "#":
             return True
         return False
@@ -205,19 +200,20 @@ class World(object):
     # opaque tiles. Normally goes in all directions, but you can constrain it.
     def fov(self,x,y,r,angles=[(0,360)]):
         report = [(x,y)]
-        for i in range(r+1):
+        for i in range(1,r+1):
             view = arc(x,y,i,angles)
             for (ox,oy) in view:
-                if self.map[oy][ox] == "#":
+                if not self.is_free(ox,oy):
                     theta = angle((x,y),(ox,oy))
-                    angles = split_arc(angles, theta, 30)
+                    angles = split_arc(angles, theta, 360./(i*6))
             report += view
         return report
     
     # Draws the world.
     def draw(self):
         gfx.clear()
-        my_fov = self.fov(self.player.x,self.player.y,6,[(self.player.angle-self.player.lense,self.player.angle+self.player.lense)])
+        my_fov = self.fov(self.player.x,self.player.y,10,[(self.player.angle-self.player.lense,self.player.angle+self.player.lense)])
+        #my_fov = self.fov(self.player.x,self.player.y,10)
         for y in range(self.h):
             odd = True if y % 2 == 1 else False
             for x in range(self.w):
