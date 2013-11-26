@@ -1,6 +1,9 @@
 from core import gfx
 from core import log
 
+import random
+
+
 # The ring function returns all of the tiles that make up the ring of radius
 # 'r' around (x,y).
 def ring(x,y,r):
@@ -52,11 +55,41 @@ def direction(x, y, d):
     else: return ring(x,y,1)[d]
 
 
+# The arc method takes a list of tuples containing "start_degree, end_degree"
+# pairs. It returns the sublist of a complete ring that fits within the starts
+# and ends.
+#
+#                90
+#           180     0
+#               270
+#       0   60  120 180 240 300 360
+#
+def arc(x, y, r, endpoints):
+    if r < 1:
+        return ring(x,y,r)
+    orig = ring(x,y,r)[:-1]
+    report = []
+    for (st, en) in endpoints:
+        chunk_size = 360.0 / (r*6)
+        h_chunk = chunk_size / 2
+        while st < 0:
+            st += 360
+            en += 360
+        if st < en:
+            st_i = int(1.0*(st+h_chunk) / chunk_size) % (r*6)
+            en_i = int(1.0*(en+h_chunk) / chunk_size) % (r*6)
+            if st_i <= en_i:
+                report += orig[st_i:en_i+1]
+            else:
+                report += orig[st_i:]
+                report += orig[:en_i+1]
+    return report
+
 # 
-def fov(x,y,r):
+def fov(x,y,r,angles):
     report = [(x,y)]
     for i in range(r+1):
-        report += ring(x,y,i)
+        report += arc(x,y,i,angles)
     return report
 
 
@@ -68,11 +101,13 @@ class Entity(object):
         self.y = y
         self.char = name[0]
         self.target = None
+        self.angle = 0
+        self.lense = 30
     
     # Attempt to move 1 tile in a direction.
-    def move(self, way):
+    def move(self, way, world):
         pos = direction(self.x, self.y, way)
-        if pos: self.x, self.y = pos
+        if pos and world.is_free(*pos): self.x, self.y = pos
 
     # Attempt to move the target.
     def target_move(self, way):
@@ -89,14 +124,27 @@ class World(object):
     def __init__(self):
         self.w = 20
         self.h = 20
+        self.map = ["."*self.w]*self.h
         self.player = Entity("Player",4,4)
         self.entities = [self.player]
         self.player.char = "@"
+        
+        
+        for a in range(self.h):
+            for b in range(self.w):
+                if random.randint(0,100) < 10:
+                    self.map[a] = self.map[a][:b]+"#"+self.map[a][b+1:]
+    
+    # Returns true if a square is free.
+    def is_free(self, x, y):
+        if self.map[y][x] != "#":
+            return True
+        return False
     
     # Draws the world.
     def draw(self):
         gfx.clear()
-        my_fov = fov(self.player.x,self.player.y,3)
+        my_fov = fov(self.player.x,self.player.y,6,[(self.player.angle-self.player.lense,self.player.angle+self.player.lense)])
         for y in range(self.h):
             odd = True if y % 2 == 1 else False
             for x in range(self.w):
@@ -111,19 +159,20 @@ class World(object):
                             gfx.draw(ax,y,e.char)
                             empty = False
                     if empty:
-                        gfx.draw(ax,y,".")
+                        c = self.map[y][x]
+                        gfx.draw(ax,y,c,"g" if c == "." else "y")
                 if self.player.target == (x,y):
                     gfx.draw(ax-1,y,"[")
                     gfx.draw(ax+1,y,"]")
 
     # Handle input.
     def handle(self, c):
-        if   c == "k": self.player.move(0)
-        elif c == "i": self.player.move(1)
-        elif c == "u": self.player.move(2)
-        elif c == "h": self.player.move(3)
-        elif c == "n": self.player.move(4)
-        elif c == "m": self.player.move(5)
+        if   c == "k": self.player.move(0,self)
+        elif c == "i": self.player.move(1,self)
+        elif c == "u": self.player.move(2,self)
+        elif c == "h": self.player.move(3,self)
+        elif c == "n": self.player.move(4,self)
+        elif c == "m": self.player.move(5,self)
         elif c == "f": self.player.target_move(0)
         elif c == "r": self.player.target_move(1)
         elif c == "e": self.player.target_move(2)
@@ -131,5 +180,8 @@ class World(object):
         elif c == "x": self.player.target_move(4)
         elif c == "c": self.player.target_move(5)
         elif c == "d": self.player.target = None
+        elif c == "left": self.player.angle = (self.player.angle+10)%360
+        elif c == "right": self.player.angle = (self.player.angle-10)%360
+        elif c == "up" and self.player.lense < 100: self.player.lense += 5
+        elif c == "down" and self.player.lense > 0: self.player.lense -= 5
         
-
