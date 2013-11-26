@@ -94,7 +94,7 @@ def angle( pos1, pos2 ):
 def split_arc(arc, angle, size):
     report = []
     for (st,en) in arc:
-        if st <= angle and angle <= en:
+        if st-size <= angle and angle <= en+size:
             s1,e1 = st,angle-size
             s2,e2 = angle+size,en
             
@@ -123,7 +123,7 @@ def direction(x, y, d):
 # and ends.
 def arc(x, y, r, endpoints):
     if r < 1:
-        return ring(x,y,r)
+        return [(x,y)]
     orig = ring(x,y,r)
     report = []
     for (st, en) in endpoints:
@@ -134,7 +134,7 @@ def arc(x, y, r, endpoints):
             en += 360
         if en-st > 359:
             return orig
-        if st < en:
+        elif en-st > h_chunk:
             st_i = int(1.0*(st+h_chunk) / chunk_size) % (r*6)
             en_i = int(1.0*(en+h_chunk) / chunk_size) % (r*6)
             if st_i <= en_i:
