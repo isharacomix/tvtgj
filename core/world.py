@@ -119,6 +119,8 @@ def angle( pos1, pos2 ):
 def split_arc(arc, angle, size):
     report = []
     arc2 = []
+    
+    # Normalize any endpoints that aren't in 0 to 360.
     for (st,en) in arc:
         while st < 0:
             st += 360
@@ -134,13 +136,11 @@ def split_arc(arc, angle, size):
         else:
             arc2.append((st,en))
     
+    # Now break all of the arcs into size on either side of angle.
     for (st,en) in arc2:
         if st-size <= angle and angle <= en+size:
             s1,e1 = st,angle-size
             s2,e2 = angle+size,en
-            
-            # Does not work on the 0,360 split, or for certain boundary
-            # cases.
             
             if e1-s1 > 5: report.append((s1,e1))
             if e2-s2 > 5: report.append((s2,e2))
