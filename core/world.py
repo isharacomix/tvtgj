@@ -45,6 +45,32 @@ def ring(x,y,r):
     # end of the list.
     return report
 
+# The arc method takes a list of tuples containing "start_degree, end_degree"
+# pairs. It returns the sublist of a complete ring that fits within the starts
+# and ends.
+def arc(x, y, r, endpoints):
+    if r < 1:
+        return [(x,y)]
+    orig = ring(x,y,r)
+    report = []
+    for (st, en) in endpoints:
+        chunk_size = 360.0 / (r*6)
+        h_chunk = chunk_size / 2
+        while st < 0:
+            st += 360
+            en += 360
+        if en-st > 359:
+            return orig
+        if st < en:
+            st_i = int(1.0*(st+h_chunk) / chunk_size) % (r*6)
+            en_i = int(1.0*(en+h_chunk) / chunk_size) % (r*6)
+            if st_i <= en_i:
+                report += orig[st_i:en_i+1]
+            else:
+                report += orig[st_i:]
+                report += orig[:en_i+1]
+    return report
+
 # This returns the distance between two tiles.
 # Algorithm: First, walk down/diagonally until at the same row. Then
 # calculate horizontal distance.
@@ -88,12 +114,27 @@ def angle( pos1, pos2 ):
     
     return angle
 
-
 # This takes the definition of an arc (a set of (st,en) tuples) and
 # breaks them at angle by putting a gap of size degrees in the arc.
 def split_arc(arc, angle, size):
     report = []
+    arc2 = []
     for (st,en) in arc:
+        while st < 0:
+            st += 360
+            en += 360
+        while st > 360:
+            st -= 360
+        
+        if en > 360:
+            arc2.append((st,360))
+            while en > 360:
+                en-=360
+            arc2.append((0, en))
+        else:
+            arc2.append((st,en))
+    
+    for (st,en) in arc2:
         if st-size <= angle and angle <= en+size:
             s1,e1 = st,angle-size
             s2,e2 = angle+size,en
@@ -101,13 +142,12 @@ def split_arc(arc, angle, size):
             # Does not work on the 0,360 split, or for certain boundary
             # cases.
             
-            if s1 < e1: report.append((s1,e1))
-            if s2 < e2: report.append((s2,e2))
+            if e1-s1 > 5: report.append((s1,e1))
+            if e2-s2 > 5: report.append((s2,e2))
         else:
             report.append((st,en))
             
     return report
-
 
 # Get the X,Y coordinates of the neighbor of x,y in direction d.
 #   2 1    Returns None if no such direction.
@@ -116,33 +156,6 @@ def split_arc(arc, angle, size):
 def direction(x, y, d):
     if d < 0 or d > 5: return None
     else: return ring(x,y,1)[d]
-
-
-# The arc method takes a list of tuples containing "start_degree, end_degree"
-# pairs. It returns the sublist of a complete ring that fits within the starts
-# and ends.
-def arc(x, y, r, endpoints):
-    if r < 1:
-        return [(x,y)]
-    orig = ring(x,y,r)
-    report = []
-    for (st, en) in endpoints:
-        chunk_size = 360.0 / (r*6)
-        h_chunk = chunk_size / 2
-        while st < 0:
-            st += 360
-            en += 360
-        if en-st > 359:
-            return orig
-        if st < en:
-            st_i = int(1.0*(st+h_chunk) / chunk_size) % (r*6)
-            en_i = int(1.0*(en+h_chunk) / chunk_size) % (r*6)
-            if st_i <= en_i:
-                report += orig[st_i:en_i+1]
-            else:
-                report += orig[st_i:]
-                report += orig[:en_i+1]
-    return report
 
 
 # An entity is anything that exists in the world.
@@ -181,7 +194,6 @@ class World(object):
         self.entities = [self.player]
         self.player.char = "@"
         
-        
         for a in range(self.h):
             for b in range(self.w):
                 #if random.randint(0,100) < 5:
@@ -212,8 +224,8 @@ class World(object):
     # Draws the world.
     def draw(self):
         gfx.clear()
-        my_fov = self.fov(self.player.x,self.player.y,10,[(self.player.angle-self.player.lense,self.player.angle+self.player.lense)])
-        #my_fov = self.fov(self.player.x,self.player.y,10)
+        #my_fov = self.fov(self.player.x,self.player.y,10,[(self.player.angle-self.player.lense,self.player.angle+self.player.lense)])
+        my_fov = self.fov(self.player.x,self.player.y,10)
         for y in range(self.h):
             odd = True if y % 2 == 1 else False
             for x in range(self.w):
@@ -253,4 +265,7 @@ class World(object):
         elif c == "right": self.player.angle = (self.player.angle-10)%360
         elif c == "up" and self.player.lense < 100: self.player.lense += 5
         elif c == "down" and self.player.lense > 0: self.player.lense -= 5
+        
+        # Debug. Logs everything that occurs in a single frame.
+        log.toggle( c == 'p' )
         
