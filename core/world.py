@@ -114,6 +114,19 @@ def angle( pos1, pos2 ):
     
     return angle
 
+# Get the point on the angle that is 'r' away from x,y. Essentially the
+# opposite of angle.
+def apoint(x,y,r,theta):
+    if r == 0:
+        return (x,y)
+    while theta < 0:
+        theta += 360
+    orig = ring(x,y,r)
+    chunk_size = 360.0 / (r*6)
+    h_chunk = chunk_size / 2
+    i = int(1.0*(theta+h_chunk) / chunk_size) % (r*6)
+    return orig[i]
+
 # This takes the definition of an arc (a set of (st,en) tuples) and
 # breaks them at angle by putting a gap of size degrees in the arc.
 def split_arc(arc, angle, size):
@@ -224,8 +237,8 @@ class World(object):
     # Draws the world.
     def draw(self):
         gfx.clear()
-        #my_fov = self.fov(self.player.x,self.player.y,10,[(self.player.angle-self.player.lense,self.player.angle+self.player.lense)])
-        my_fov = self.fov(self.player.x,self.player.y,10)
+        my_fov = self.fov(self.player.x,self.player.y,10,[(self.player.angle-self.player.lense,self.player.angle+self.player.lense)])
+        #my_fov = self.fov(self.player.x,self.player.y,10)
         for y in range(self.h):
             odd = True if y % 2 == 1 else False
             for x in range(self.w):
@@ -243,8 +256,8 @@ class World(object):
                         c = self.map[y][x]
                         gfx.draw(ax,y,c,"g" if c == "." else "y")
                 if self.player.target == (x,y):
-                    gfx.draw(ax-1,y,"[","r!")
-                    gfx.draw(ax+1,y,"]","xX!")
+                    gfx.draw(ax-1,y,"[")
+                    gfx.draw(ax+1,y,"]")
 
     # Handle input.
     def handle(self, c):
@@ -261,10 +274,10 @@ class World(object):
         elif c == "x": self.player.target_move(4)
         elif c == "c": self.player.target_move(5)
         elif c == "d": self.player.target = None
-        elif c == "left": self.player.angle = (self.player.angle+10)%360
-        elif c == "right": self.player.angle = (self.player.angle-10)%360
-        elif c == "up" and self.player.lense < 100: self.player.lense += 5
-        elif c == "down" and self.player.lense > 0: self.player.lense -= 5
+        elif c == "left": self.player.angle = (self.player.angle+5)%360
+        elif c == "right": self.player.angle = (self.player.angle-5)%360
+        elif c == "up" and self.player.lense < 100: self.player.lense += 1
+        elif c == "down" and self.player.lense > 0: self.player.lense -= 1
         
         # Debug. Logs everything that occurs in a single frame.
         log.toggle( c == 'p' )
