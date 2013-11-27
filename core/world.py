@@ -127,6 +127,18 @@ def apoint(x,y,r,theta):
     i = int(1.0*(theta+h_chunk) / chunk_size) % (r*6)
     return orig[i]
 
+# Return a line of points from x,y to apoint(r,theta).
+def aline(x,y,r,theta):
+    report = []
+    for i in range(1,r+1):
+        report.append( apoint(x,y,i,theta) )
+    return report
+
+# Version of "aline" that let's you enter two x,y points.
+def line(pos1,pos2):
+    return aline(pos1[0],pos1[1],distance(pos1,pos2),angle(pos1,pos2))
+
+
 # This takes the definition of an arc (a set of (st,en) tuples) and
 # breaks them at angle by putting a gap of size degrees in the arc.
 def split_arc(arc, angle, size):
@@ -181,11 +193,14 @@ class Entity(object):
         self.target = None
         self.angle = 0
         self.lense = 30
+        self.hp = 5
     
     # Attempt to move 1 tile in a direction.
     def move(self, way, world):
         pos = direction(self.x, self.y, way)
-        if pos and world.is_free(*pos): self.x, self.y = pos
+        if pos and world.is_free(*pos):
+            if not self.target: self.angle = angle((self.x,self.y),pos)
+            self.x, self.y = pos
 
     # Attempt to move the target.
     def target_move(self, way):
@@ -194,7 +209,29 @@ class Entity(object):
         x,y = self.target
         pos = direction(x,y,way)
         if pos: self.target = pos
-        
+    
+    # Try to do something intelligent and fail.
+    def ai(self, world):
+        if self.hp > 0:
+            my_fov = world.fov(self.x,self.y,10,[(self.angle-self.lense,self.angle+self.lense)])
+            foundem = False
+            for (x,y) in my_fov:
+                if (x,y) == (world.player.x,world.player.y) and world.player.hp > 0:
+                    self.target = x,y
+                    foundem = True
+            if foundem:
+                self.fire(world)
+            else:
+                self.move(random.randint(0,6), world)
+    
+    # Here we try to fire in the direction of the target.
+    def fire(self, world):
+        if self.target:
+            error = random.randint(0,30)-15
+            world.bullet_anim = aline(self.x,self.y,
+                             distance((self.x,self.y),self.target),
+                             error+angle((self.x,self.y),self.target))
+            
 
 # The World is our view into the tiled game world. Entities exist within the
 # world and are located at x,y coordinates that represent tiles.
@@ -206,12 +243,19 @@ class World(object):
         self.player = Entity("Player",15,5)
         self.entities = [self.player]
         self.player.char = "@"
+        self.bullet_anim = []
+        self.anim_tick = 0
+        self.anim_speed = 40
+        self.turn = 0
         
         for a in range(self.h):
             for b in range(self.w):
-                #if random.randint(0,100) < 5:
-                if a == 10 or b == 10:
+                if random.randint(0,100) < 5:
+                #if a == 10 or b == 10:
                     self.map[a] = self.map[a][:b]+"#"+self.map[a][b+1:]
+        for a in range(4):
+            e = Entity("Bad Guy",random.randint(5,15),random.randint(5,15))
+            self.entities.append(e)
     
     # Returns true if a square is free.
     def is_free(self, x, y):
@@ -236,9 +280,27 @@ class World(object):
     
     # Draws the world.
     def draw(self):
+        self.anim_tick = (self.anim_tick + 1)%self.anim_speed
+        if self.anim_tick == 0:
+            if len(self.bullet_anim)>0:
+                x,y = self.bullet_anim.pop(0)
+                if not self.is_free(x,y):
+                    self.bullet_anim = []
+                for e in self.entities:
+                    if (e.x,e.y) == (x,y):
+                        e.hp -= 1
+                        if e.hp < 1: e.char = "%"
+                        self.bullet_anim = []
+        
         gfx.clear()
+        if self.player.target:
+            a = angle((self.player.x,self.player.y),self.player.target)
+            if a is not None: self.player.angle = a
         my_fov = self.fov(self.player.x,self.player.y,10,[(self.player.angle-self.player.lense,self.player.angle+self.player.lense)])
         #my_fov = self.fov(self.player.x,self.player.y,10)
+        lineee = []
+        if self.player.target:
+            lineee = line((self.player.x,self.player.y),self.player.target)
         for y in range(self.h):
             odd = True if y % 2 == 1 else False
             for x in range(self.w):
@@ -250,17 +312,28 @@ class World(object):
                     empty = True
                     for e in self.entities:
                         if (e.x,e.y) == (x,y):
-                            gfx.draw(ax,y,e.char)
+                            gfx.draw(ax,y,e.char,"b!" if e is self.player else "r!")
                             empty = False
                     if empty:
                         c = self.map[y][x]
                         gfx.draw(ax,y,c,"g" if c == "." else "y")
+                    if len(self.bullet_anim)>0 and self.bullet_anim[0] == (x,y):
+                        gfx.draw(ax,y,"*",'r')
                 if self.player.target == (x,y):
                     gfx.draw(ax-1,y,"[")
                     gfx.draw(ax+1,y,"]")
 
     # Handle input.
     def handle(self, c):
+        if len(self.bullet_anim) > 0:
+            return #no movement during animation
+        
+        if self.entities[self.turn] is not self.player:
+            self.entities[self.turn].ai(self)
+            self.turn = (self.turn+1)%len(self.entities)
+            return
+        
+        moved = True
         if   c == "k": self.player.move(0,self)
         elif c == "i": self.player.move(1,self)
         elif c == "u": self.player.move(2,self)
@@ -278,6 +351,10 @@ class World(object):
         elif c == "right": self.player.angle = (self.player.angle-5)%360
         elif c == "up" and self.player.lense < 100: self.player.lense += 1
         elif c == "down" and self.player.lense > 0: self.player.lense -= 1
+        elif c == "z": self.player.fire(self)
+        else: moved = False
+        
+        if moved: self.turn = (self.turn+1)%len(self.entities)
         
         # Debug. Logs everything that occurs in a single frame.
         log.toggle( c == 'p' )
