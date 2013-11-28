@@ -30,6 +30,7 @@ class Game(object):
                 self.world.handle(c)
                 if c == "q": running = False
                 self.world.draw()
+                self.world.draw_gui()
         except:
             gfx.stop()  
             print(traceback.format_exc())

@@ -194,6 +194,7 @@ class Entity(object):
         self.angle = 0
         self.lense = 30
         self.hp = 5
+        self.init = 0
     
     # Attempt to move 1 tile in a direction.
     def move(self, way, world):
@@ -201,6 +202,7 @@ class Entity(object):
         if pos and world.is_free(*pos):
             if not self.target: self.angle = angle((self.x,self.y),pos)
             self.x, self.y = pos
+            self.init -= 5
 
     # Attempt to move the target.
     def target_move(self, way):
@@ -209,9 +211,11 @@ class Entity(object):
         x,y = self.target
         pos = direction(x,y,way)
         if pos: self.target = pos
+        self.init -= 1
     
     # Try to do something intelligent and fail.
     def ai(self, world):
+        self.init -= 1
         if self.hp > 0:
             my_fov = world.fov(self.x,self.y,10,[(self.angle-self.lense,self.angle+self.lense)])
             foundem = False
@@ -231,22 +235,26 @@ class Entity(object):
             world.bullet_anim = aline(self.x,self.y,
                              distance((self.x,self.y),self.target),
                              error+angle((self.x,self.y),self.target))
+            self.init -= 4
+            world.gui_log("BANG!")
             
 
 # The World is our view into the tiled game world. Entities exist within the
 # world and are located at x,y coordinates that represent tiles.
 class World(object):
     def __init__(self):
-        self.w = 20
-        self.h = 20
+        self.w = 40
+        self.h = 40
+        self.camera = 0,0
         self.map = ["."*self.w]*self.h
         self.player = Entity("Player",15,5)
         self.entities = [self.player]
         self.player.char = "@"
         self.bullet_anim = []
         self.anim_tick = 0
-        self.anim_speed = 40
+        self.anim_speed = 30
         self.turn = 0
+        self.log = ["May the best @ win!"]
         
         for a in range(self.h):
             for b in range(self.w):
@@ -255,6 +263,7 @@ class World(object):
                     self.map[a] = self.map[a][:b]+"#"+self.map[a][b+1:]
         for a in range(4):
             e = Entity("Bad Guy",random.randint(5,15),random.randint(5,15))
+            e.char = "@"
             self.entities.append(e)
     
     # Returns true if a square is free.
@@ -279,7 +288,15 @@ class World(object):
         return report
     
     # Draws the world.
-    def draw(self):
+    def draw(self, cw=20, ch=20, vx=0, vy=0):
+        cx,cy = self.camera 
+        dx,dy = self.player.x-cx, self.player.y-cy
+        if dx > 15 or dx < 5:
+            cx = self.player.x - cw/2
+        if dy > 15 or dy < 5:
+            cy = self.player.y - ch/2
+        self.camera = cx,cy
+        
         self.anim_tick = (self.anim_tick + 1)%self.anim_speed
         if self.anim_tick == 0:
             if len(self.bullet_anim)>0:
@@ -289,7 +306,11 @@ class World(object):
                 for e in self.entities:
                     if (e.x,e.y) == (x,y):
                         e.hp -= 1
-                        if e.hp < 1: e.char = "%"
+                        if e is self.player:
+                            self.gui_log("I'm hit!")
+                        if e.hp < 1:
+                            e.char = "%"
+                            self.gui_log("%s has died. :("%(e.name))
                         self.bullet_anim = []
         
         gfx.clear()
@@ -298,13 +319,25 @@ class World(object):
             if a is not None: self.player.angle = a
         my_fov = self.fov(self.player.x,self.player.y,10,[(self.player.angle-self.player.lense,self.player.angle+self.player.lense)])
         #my_fov = self.fov(self.player.x,self.player.y,10)
+        #my_fov = []
+        #for a in range(self.w):
+        #    for b in range(self.h):
+        #        my_fov.append((a,b))
         lineee = []
         if self.player.target:
             lineee = line((self.player.x,self.player.y),self.player.target)
+        all_fovs = {}
+        for e in self.entities:
+            all_fovs[e] = self.fov(e.x,e.y,10,[(e.angle-e.lense,e.angle+e.lense)])
         for y in range(self.h):
             odd = True if y % 2 == 1 else False
             for x in range(self.w):
-                ax = x*2 + (1 if odd else 0)
+                if not(x >= cx and x < cx+cw and y >= cy and y < cy+ch):
+                    continue
+            
+            
+                ax = (x-cx+vx)*2 + (1 if odd else 0)
+                ay = (y-cy+vy)
             
                 # For each tile that can be seen, determine what will be drawn
                 # there.
@@ -312,28 +345,66 @@ class World(object):
                     empty = True
                     for e in self.entities:
                         if (e.x,e.y) == (x,y):
-                            gfx.draw(ax,y,e.char,"b!" if e is self.player else "r!")
+                            gfx.draw(ax,ay,e.char,"b!" if e is self.player else "r!")
                             empty = False
                     if empty:
                         c = self.map[y][x]
-                        gfx.draw(ax,y,c,"g" if c == "." else "y")
+                        gfx.draw(ax,ay,c,"g" if c == "." else "y")
                     if len(self.bullet_anim)>0 and self.bullet_anim[0] == (x,y):
-                        gfx.draw(ax,y,"*",'r')
+                        gfx.draw(ax,ay,"*",'r')
+                else:
+                    for e in self.entities:
+                        if (e is not self.player and (e.x,e.y)==(x,y) and
+                            (self.player.x,self.player.y) in all_fovs[e]):
+                                gfx.draw(ax,ay,"\"","r!")
                 if self.player.target == (x,y):
-                    gfx.draw(ax-1,y,"[")
-                    gfx.draw(ax+1,y,"]")
+                    gfx.draw(ax-1,ay,"[")
+                    gfx.draw(ax+1,ay,"]")
 
+
+    # Draw the datalog.
+    def draw_gui(self, vx=41, vy=0, vw=38, vh=20 ):
+        x = vx
+        for c in "Robot Battle":
+            gfx.draw(x,vy,c) 
+            x += 1
+        x = vx
+        for c in "Your HP: %d"%self.player.hp:
+            gfx.draw(x,vy+1,c)
+            x += 1
+    
+    
+        printy = self.log[-min(vh-3,len(self.log)):]
+        y = vy+3
+        for p in printy:
+            x = vx
+            for c in p[:vw]:
+                gfx.draw(x,y,c)
+                x += 1
+            y += 1
+    
+    def gui_log(self, s):
+        self.log.append(s)
+    
     # Handle input.
     def handle(self, c):
         if len(self.bullet_anim) > 0:
             return #no movement during animation
         
-        if self.entities[self.turn] is not self.player:
-            self.entities[self.turn].ai(self)
+        # Check init.
+        current = self.entities[self.turn]
+        if current.init < 0:
             self.turn = (self.turn+1)%len(self.entities)
+            if self.turn == 0:
+                for e in self.entities:
+                    e.init += 10
+                return
+        
+        
+        if current is not self.player:
+            current.ai(self)
             return
         
-        moved = True
         if   c == "k": self.player.move(0,self)
         elif c == "i": self.player.move(1,self)
         elif c == "u": self.player.move(2,self)
@@ -347,14 +418,16 @@ class World(object):
         elif c == "x": self.player.target_move(4)
         elif c == "c": self.player.target_move(5)
         elif c == "d": self.player.target = None
-        elif c == "left": self.player.angle = (self.player.angle+5)%360
-        elif c == "right": self.player.angle = (self.player.angle-5)%360
+        elif c == "left": self.player.angle = (self.player.angle+5)%360 ; self.player.init -= 2
+        elif c == "right": self.player.angle = (self.player.angle-5)%360 ; self.player.init -= 2
         elif c == "up" and self.player.lense < 100: self.player.lense += 1
         elif c == "down" and self.player.lense > 0: self.player.lense -= 1
         elif c == "z": self.player.fire(self)
-        else: moved = False
         
-        if moved: self.turn = (self.turn+1)%len(self.entities)
+        elif c == "1": self.gui_log("Hello!")
+        elif c == "2": self.gui_log("Goodbye!")
+        
+        #if moved: self.turn = (self.turn+1)%len(self.entities)
         
         # Debug. Logs everything that occurs in a single frame.
         log.toggle( c == 'p' )
