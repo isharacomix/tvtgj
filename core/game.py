@@ -24,11 +24,9 @@ class Game(object):
         gfx.start()
         
         try:
-            running = True
-            while running:
+            while self.world.running:
                 c = gfx.get_input()
                 self.world.handle(c)
-                if c == "q": running = False
                 self.world.draw()
                 self.world.draw_gui()
         except:

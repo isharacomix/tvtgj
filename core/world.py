@@ -119,8 +119,7 @@ def angle( pos1, pos2 ):
 def apoint(x,y,r,theta):
     if r == 0:
         return (x,y)
-    while theta < 0:
-        theta += 360
+    theta = theta%360
     orig = ring(x,y,r)
     chunk_size = 360.0 / (r*6)
     h_chunk = chunk_size / 2
@@ -150,22 +149,27 @@ def split_arc(arc, angle, size):
         while st < 0:
             st += 360
             en += 360
-        while st > 360:
-            st -= 360
+        st = st%360
         
         if en > 360:
             arc2.append((st,360))
-            while en > 360:
-                en-=360
-            arc2.append((0, en))
+            arc2.append((0, en%360))
         else:
             arc2.append((st,en))
     
     # Now break all of the arcs into size on either side of angle.
     for (st,en) in arc2:
-        if st-size <= angle and angle <= en+size:
+        if ((st-size <= angle and angle <= en+size)):
             s1,e1 = st,angle-size
             s2,e2 = angle+size,en
+            
+            if e1-s1 > 5: report.append((s1,e1))
+            if e2-s2 > 5: report.append((s2,e2))
+            
+        elif (st-size <= 360+angle and 360+angle <= en+size):
+            
+            s1,e1 = st,360+angle-size
+            s2,e2 = 360+angle+size,en
             
             if e1-s1 > 5: report.append((s1,e1))
             if e2-s2 > 5: report.append((s2,e2))
@@ -194,6 +198,8 @@ class Entity(object):
         self.angle = 0
         self.lense = 30
         self.hp = 5
+        self.speed = 10
+        self.toughness = 1
         self.init = 0
     
     # Attempt to move 1 tile in a direction.
@@ -203,6 +209,7 @@ class Entity(object):
             if not self.target: self.angle = angle((self.x,self.y),pos)
             self.x, self.y = pos
             self.init -= 5
+        
 
     # Attempt to move the target.
     def target_move(self, way):
@@ -231,10 +238,12 @@ class Entity(object):
     # Here we try to fire in the direction of the target.
     def fire(self, world):
         if self.target:
-            error = random.randint(0,30)-15
+            d = distance((self.x,self.y),self.target)
+            error = random.randint(max(-d,-60),min(d,60))
             world.bullet_anim = aline(self.x,self.y,
                              distance((self.x,self.y),self.target),
                              error+angle((self.x,self.y),self.target))
+            world.bullet_power = self.toughness
             self.init -= 4
             world.gui_log("BANG!")
             
@@ -243,26 +252,48 @@ class Entity(object):
 # world and are located at x,y coordinates that represent tiles.
 class World(object):
     def __init__(self):
+        self.new_world(1)
+        self.running = True
+        self.dead_clock = 800
+        self.difficulty = 1
+        self.bullet_power = 0
+        self.log = ["May the best @ win!"]
+    
+    def new_world(self, enemies):
         self.w = 40
         self.h = 40
         self.camera = 0,0
         self.map = ["."*self.w]*self.h
         self.player = Entity("Player",15,5)
         self.entities = [self.player]
+        self.stuff = []
         self.player.char = "@"
         self.bullet_anim = []
         self.anim_tick = 0
         self.anim_speed = 30
         self.turn = 0
-        self.log = ["May the best @ win!"]
         
         for a in range(self.h):
             for b in range(self.w):
                 if random.randint(0,100) < 5:
-                #if a == 10 or b == 10:
                     self.map[a] = self.map[a][:b]+"#"+self.map[a][b+1:]
-        for a in range(4):
-            e = Entity("Bad Guy",random.randint(5,15),random.randint(5,15))
+                elif random.randint(0,100) < 1:
+                    x = random.randint(0,3)
+                    if x == 0:
+                        e = Entity("+Health",b,a)
+                        e.char = "+"
+                        self.stuff.append(e)
+                    elif x == 1: 
+                        e = Entity("!Toughness",b,a)
+                        e.char = "!"
+                        self.stuff.append(e)
+                    elif x == 2: 
+                        e = Entity(">Fastness",b,a)
+                        e.char = ">"
+                        self.stuff.append(e)
+        
+        for a in range(enemies):
+            e = Entity("Bad Guy",random.randint(5,35),random.randint(5,35))
             e.char = "@"
             self.entities.append(e)
     
@@ -289,12 +320,17 @@ class World(object):
     
     # Draws the world.
     def draw(self, cw=20, ch=20, vx=0, vy=0):
-        cx,cy = self.camera 
-        dx,dy = self.player.x-cx, self.player.y-cy
+        cx,cy = self.camera
+        qx,qy = self.player.x, self.player.y
+        if self.player.target:
+            qx,qy = self.player.target
+        
+        dx,dy = qx-cx, qy-cy
+        
         if dx > 15 or dx < 5:
-            cx = self.player.x - cw/2
+            cx = qx - cw/2
         if dy > 15 or dy < 5:
-            cy = self.player.y - ch/2
+            cy = qy - ch/2
         self.camera = cx,cy
         
         self.anim_tick = (self.anim_tick + 1)%self.anim_speed
@@ -305,13 +341,27 @@ class World(object):
                     self.bullet_anim = []
                 for e in self.entities:
                     if (e.x,e.y) == (x,y):
-                        e.hp -= 1
+                        e.hp -= self.bullet_power
                         if e is self.player:
                             self.gui_log("I'm hit!")
                         if e.hp < 1:
                             e.char = "%"
                             self.gui_log("%s has died. :("%(e.name))
                         self.bullet_anim = []
+        
+        for s in self.stuff[:]:
+            if (s.x,s.y)==(self.player.x,self.player.y):
+                self.stuff.remove(s)
+                if s.name[0] == "+":
+                    self.player.hp += 1
+                    self.gui_log("You feel healthier!")
+                elif s.name[0] == "!":
+                    self.player.toughness += 1
+                    self.gui_log("You feel tougher!")
+                elif s.name[0] == ">":
+                    self.player.speed += 1
+                    self.gui_log("You are faster now!")
+                    
         
         gfx.clear()
         if self.player.target:
@@ -343,6 +393,10 @@ class World(object):
                 # there.
                 if (x,y) in my_fov:
                     empty = True
+                    for s in self.stuff:
+                        if (s.x,s.y) == (x,y):
+                            gfx.draw(ax,ay,s.char,"m!")
+                            empty = False
                     for e in self.entities:
                         if (e.x,e.y) == (x,y):
                             gfx.draw(ax,ay,e.char,"b!" if e is self.player else "r!")
@@ -386,10 +440,27 @@ class World(object):
     def gui_log(self, s):
         self.log.append(s)
     
+    
     # Handle input.
     def handle(self, c):
         if len(self.bullet_anim) > 0:
             return #no movement during animation
+        
+        # Check for game lose/win conditions.
+        if self.player.hp <= 0:
+            self.dead_clock -= 1
+            if self.dead_clock <= 0:
+                self.running = False
+            return
+        all_dead = True
+        for x in self.entities:
+            if x is not self.player and x.hp > 0:
+                all_dead = False
+        if all_dead:
+            self.gui_log("You killed all the bad guys!")
+            self.gui_log("Next level...")
+            self.difficulty += 1
+            self.new_world(self.difficulty)
         
         # Check init.
         current = self.entities[self.turn]
@@ -397,7 +468,7 @@ class World(object):
             self.turn = (self.turn+1)%len(self.entities)
             if self.turn == 0:
                 for e in self.entities:
-                    e.init += 10
+                    e.init += e.speed
                 return
         
         
@@ -423,6 +494,7 @@ class World(object):
         elif c == "up" and self.player.lense < 100: self.player.lense += 1
         elif c == "down" and self.player.lense > 0: self.player.lense -= 1
         elif c == "z": self.player.fire(self)
+        elif c == "q": self.running = False
         
         elif c == "1": self.gui_log("Hello!")
         elif c == "2": self.gui_log("Goodbye!")
