@@ -71,7 +71,7 @@ keymap = {curses.KEY_BACKSPACE: "backspace",
           curses.KEY_DOWN:      "down",
           curses.KEY_LEFT:      "left",
           curses.KEY_RIGHT:     "right",
-          curses.KEY_ENTER:     "\n",
+          curses.KEY_ENTER:     "enter",
           curses.KEY_END:       "end",
           curses.KEY_HOME:      "home",
           curses.KEY_F0:        "f0",
@@ -99,7 +99,8 @@ def get_input():
     if screen:
         c = screen.getch()
         #curses.flushinp()
-        if c > 0 and c < 256: return "%c"%c
+        if c == 10 or c == 13: return "enter"
+        elif c > 0 and c < 256: return "%c"%c
         elif c in keymap: return keymap[c]
     return None
 
