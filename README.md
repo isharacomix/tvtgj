@@ -4,6 +4,18 @@ It'll never catch on!
 ### A "two-stick" roguelike shooter set in the distant future.
 
 
+Requirements
+------------
+To play this game, you need *Python* and Python's *curses* module. This comes
+out of the box on Linux, and I don't know about Windows. If you want to play this
+game on Windows, figure out the answer to the following questions:
+
+ * How do I install Python on Windows
+ * How do I install the unofficial Curses module on Windows?
+ * How do I run "roguelike.py" on Windows?
+
+
+
 Plot
 ----
 You are a blue robot and are fighting evil bad red robots in a dark forest.
