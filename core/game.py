@@ -44,19 +44,24 @@ class Game(object):
     # world until we are told we don't need to anymore. If an error occurs, we
     # turn off graphics, print the traceback, and kill the program.
     def play(self):
-        gfx.start()
+        try: 
+            gfx.start("sdl")
+        except:
+            gfx.start("ascii")
         
         try:
             c = -1
             while c != "enter":
                 self.display_title()
                 c = gfx.get_input()
+                gfx.refresh()
         
             while self.world.running:
                 c = gfx.get_input()
                 self.world.handle(c)
                 self.world.draw()
                 self.world.draw_gui()
+                gfx.refresh()
         except:
             gfx.stop()  
             print(traceback.format_exc())
