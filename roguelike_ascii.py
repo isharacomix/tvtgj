@@ -2,7 +2,7 @@
 
 from core import game
 
-G = game.Game()
+G = game.Game(False)
 G.play()
 
 

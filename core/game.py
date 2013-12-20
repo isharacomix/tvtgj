@@ -13,8 +13,9 @@ import traceback
 # A Game represents a single instance of a game, including its maps,
 # data, and everything else.
 class Game(object):
-    def __init__(self):
+    def __init__(self, sdl):
         self.world = world.World()
+        self.sdl = sdl
     
     
     def display_title(self):
@@ -44,10 +45,12 @@ class Game(object):
     # world until we are told we don't need to anymore. If an error occurs, we
     # turn off graphics, print the traceback, and kill the program.
     def play(self):
+        first, second = "sdl","ascii"
+        if not self.sdl: first,second = "ascii","sdl"
         try: 
-            gfx.start("sdl")
+            gfx.start(first)
         except:
-            gfx.start("ascii")
+            gfx.start(second)
         
         try:
             c = -1
