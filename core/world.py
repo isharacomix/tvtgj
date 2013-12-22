@@ -270,7 +270,7 @@ class World(object):
         self.player.char = "@"
         self.bullet_anim = []
         self.anim_tick = 0
-        self.anim_speed = 30
+        self.anim_speed = 2
         self.turn = 0
         
         for a in range(self.h):
