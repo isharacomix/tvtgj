@@ -23,8 +23,8 @@ from core import log
 # changed, and the dirty list shows all of the rectangles that should be
 # updated on the screen.
 _screen = None
-_fakescreen = {}
-_dirty = []
+_changes = {}
+_sw, _sh, _tw, _th = 0,0,0,0
 
 
 # The Start function creates a 24x80 tile surface attached to the window and
@@ -39,18 +39,19 @@ _colors = { "x": (0,0,0),
             "c": (0,200,200),
             "w": (200,200,200),
     }
-def start():
+def start( screen_w=80, screen_h=24, tile_w=15, tile_h=30):
     global _screen, _tiles, _colors, _fakescreen, _dirty
+    global _sw, _sh, _tw, _th
     if not _screen:
         pygame.init()
         pygame.key.set_repeat(500,100)
-        _screen = pygame.display.set_mode((800,720))
+        _sw, _sh, _tw, _th = screen_w, screen_h, tile_w, tile_h
+        _screen = pygame.display.set_mode((_sw*_tw, _sh*_th))
         _screen.fill((0,0,0))
-        _fakescreen = {}
-        _dirty = []
+        _changes = {}
         
         if _tiles is None:
-            f = pygame.font.Font(None,28)
+            f = pygame.font.Font(None,_th-2)
             _tiles = {}
             for c in (" abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ"+
                       "1234567890-=\\[];',./`~!@#$%^&*()_+|{}:\"<>?"):
@@ -66,11 +67,11 @@ def start():
                 # Here we render the character and align it to our grid.
                 s1 = f.render(c,True,fg_col,bg_col).convert()
                 w,h = s1.get_size()
-                w = min(w,8)
-                s1 = pygame.transform.smoothscale(s1.convert(),(w,28))
-                s2 = pygame.Surface((10,30))
+                w = min(w,_tw-2)
+                s1 = pygame.transform.smoothscale(s1.convert(),(w,_th-2))
+                s2 = pygame.Surface((_tw,_th))
                 s2.fill(bg_col)
-                s2.blit(s1, (8-w,0) )
+                s2.blit(s1, (_tw//2-(w//2),1) )
                 
                 # Store the surface in the tiles dictionary.
                 _tiles[(c,fg,bg,bold)] = s2.convert()
@@ -138,29 +139,17 @@ def get_input():
 # This redraws the screen and handles the framerate. Should be called once
 # per game tick.
 def refresh():
-    global _screen, _dirty
+    global _screen, _changes, _tw, _th
     if _screen:
         pygame.time.wait(20)
-        if len(_dirty) > 0:
-            pygame.display.update(_dirty)
-            _dirty = []
-
-# Clear the screen.
-def clear():
-    global _screen, _dirty, _fakescreen
-    if _screen:
-        _screen.fill((0,0,0))
-        _dirty.append(_screen.get_rect())
-        _fakescreen = {}
-
-# Draw a character at X,Y. Includes boundary checking. You can also
-# include color codes. Lowercase letters are foreground, uppercase are
-# background. Use an ! for bold and ? for reverse
-def draw(x,y,c,col=""):
-    global _screen, _tiles, _dirty, _fakescreen
-    if _screen:
-        if _fakescreen.get((x,y)) != (c,col):
-            target = pygame.Rect(x*10,y*30,10,30)
+        dirty = []
+        
+        cleared = False
+        if "cleared" in _changes:
+            cleared = _changes.pop("cleared")
+        for x,y in _changes:
+            c,col = _changes[(x,y)]
+            target = pygame.Rect(x*_tw,y*_th,_tw,_th)
             bold = "!" in col
             fg = "w"
             bg = "x"
@@ -171,6 +160,26 @@ def draw(x,y,c,col=""):
             if "?" in col:
                 fg,bg=bg,fg
             _screen.blit(_tiles[(c,fg,bg,bold)],target)
-            _dirty.append(target)
-            _fakescreen[(x,y)] = (c,col)
+            dirty.append(target)
+        if cleared:
+            pygame.display.update()
+        elif len(dirty) > 0:
+            pygame.display.update(dirty)
+        _changes = {}
+
+# Clear the screen.
+def clear():
+    global _screen, _changes
+    if _screen:
+        _screen.fill((0,0,0))
+        _changes = {"cleared": True}
+
+# Draw a character at X,Y. Includes boundary checking. You can also
+# include color codes. Lowercase letters are foreground, uppercase are
+# background. Use an ! for bold and ? for reverse
+def draw(x,y,c,col=""):
+    global _screen, _changes
+    if _screen:
+        if _changes.get((x,y)) != (c,col):
+            _changes[(x,y)] = (c,col)
 
